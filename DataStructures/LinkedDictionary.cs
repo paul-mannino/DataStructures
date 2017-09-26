@@ -46,7 +46,7 @@ namespace DataStructures
             }
         }
 
-        TValue IDictionary<TKey, TValue>.this[TKey key]
+        public TValue this[TKey key]
         {
             get { return entryMap[key].Value; }
 
@@ -69,7 +69,7 @@ namespace DataStructures
             get { return entryMap.Count; }
         }
 
-        ICollection<TKey> IDictionary<TKey, TValue>.Keys
+        public ICollection<TKey> Keys
         {
             get
             {
@@ -78,7 +78,7 @@ namespace DataStructures
             }
         }
 
-        ICollection<TValue> IDictionary<TKey, TValue>.Values
+        public ICollection<TValue> Values
         {
             get
             {
@@ -97,9 +97,10 @@ namespace DataStructures
             version++;
             Entry entry = new Entry(key, value);
             entryMap.Add(key, entry);
+            InsertInLinkedList(entry);
         }
 
-        void ICollection<KeyValuePair<TKey, TValue>>.Clear()
+        public void Clear()
         {
             if (entryMap.Count > 0)
             {
@@ -109,7 +110,7 @@ namespace DataStructures
             }
         }
 
-        bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item)
+        public bool Contains(KeyValuePair<TKey, TValue> item)
         {
             Entry entry;
             if (entryMap.TryGetValue(item.Key, out entry))
@@ -143,7 +144,7 @@ namespace DataStructures
 
             foreach (var kvp in this)
             {
-                array.SetValue(kvp, arrayIndex++);
+                array[arrayIndex++] = kvp;
             }
         }
 
@@ -209,7 +210,7 @@ namespace DataStructures
         }
 
 
-        bool ICollection<KeyValuePair<TKey, TValue>>.IsReadOnly
+        public bool IsReadOnly
         {
             get { return false; }
         }
