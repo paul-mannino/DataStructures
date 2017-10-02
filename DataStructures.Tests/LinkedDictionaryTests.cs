@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.IO;
 using DataStructures;
 using Xunit;
 
@@ -180,7 +181,7 @@ namespace DataStructures.Tests
                 }
             };
 
-            Assert.ThrowsAny<InvalidOperationException>(f);
+            Assert.Throws<InvalidOperationException>(f);
         }
 
         [Fact]
@@ -200,7 +201,7 @@ namespace DataStructures.Tests
                 }
             };
 
-            Assert.ThrowsAny<InvalidOperationException>(f);
+            Assert.Throws<InvalidOperationException>(f);
         }
 
         [Fact]
@@ -213,7 +214,42 @@ namespace DataStructures.Tests
                 linkedDictionary.Add(key, key.GetHashCode());
             }
 
-            Assert.Equal<string>(keys, linkedDictionary.Keys);
+            List<string> actual = linkedDictionary.Select(x => x.Key).ToList();
+            Assert.Equal<string>(keys, actual);
+        }
+
+        [Fact]
+        public void GetEnumerator_ArbitarilyOrderedDictionary_KeysRetainOrderAfterMutation()
+        {
+            List<string> keys = new List<string>() { "a", "c", "q", "f", "t", "s", "v", "x", "z", "y" };
+            var linkedDictionary = new LinkedDictionary<string, int>();
+            foreach (string key in keys)
+            {
+                linkedDictionary.Add(key, key.GetHashCode());
+            }
+
+            keys.Remove("f");
+            linkedDictionary.Remove("f");
+            keys.Add("r");
+            linkedDictionary.Add("r", "r".GetHashCode());
+
+            List<string> actual = linkedDictionary.Select(x => x.Key).ToList();
+            Assert.Equal<string>(keys, actual);
+        }
+
+        [Fact]
+        public void Serialization_PopulatedDictionary_DeserializationWorksAsExpected()
+        {
+            var original = InitializeDictionarySequentialKeys(20);
+            var bf = new BinaryFormatter();
+            var ms = new MemoryStream();
+            bf.Serialize(ms, original);
+
+            ms.Position = 0;
+
+            LinkedDictionary<int, int> deserialized = bf.Deserialize(ms) as LinkedDictionary<int, int>;
+
+            Assert.True(DictionaryKVPsInSameSequence(deserialized, original));
         }
 
         private static LinkedDictionary<int, int> InitializeDictionarySequentialKeys(int nKeys)
@@ -251,6 +287,287 @@ namespace DataStructures.Tests
             }
 
             return true;
+        }
+            
+        private static bool DictionaryKVPsInSameSequence<TKey, TValue>(IDictionary<TKey, TValue> first, IDictionary<TKey, TValue> second)
+        {
+            if (first.Count != second.Count)
+            {
+                return false;
+            }
+
+            var firstEnumerator = first.GetEnumerator();
+            var secondEnumerator = second.GetEnumerator();
+
+            while (firstEnumerator.MoveNext() && secondEnumerator.MoveNext())
+            {
+                if (!firstEnumerator.Current.Key.Equals(secondEnumerator.Current.Key) ||
+                    !firstEnumerator.Current.Value.Equals(secondEnumerator.Current.Value))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public class KeyCollectionTests
+        {
+            [Fact]
+            public void Count_InitializedDictionary_KeyCountMatchesDictionaryCount()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+
+                Assert.Equal(dictionary.Count, dictionary.Keys.Count);
+            }
+
+            [Fact]
+            public void Add_ArbitraryKeyCollection_ThrowsException()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+                var keys = dictionary.Keys;
+
+                Action add = () => keys.Add(1);
+                Assert.Throws<NotSupportedException>(add);
+            }
+
+            [Fact]
+            public void Clear_ArbitraryKeyCollection_ThrowsException()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+                var keys = dictionary.Keys;
+
+                Action clear = () => keys.Clear();
+                Assert.Throws<NotSupportedException>(clear);
+            }
+
+            [Fact]
+            public void Remove_ArbitraryKeyCollection_ThrowsException()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+                var keys = dictionary.Keys;
+
+                Action remove = () => keys.Remove(5);
+                Assert.Throws<NotSupportedException>(remove);
+            }
+
+            [Fact]
+            public void Contains_KeyInCollection_ReturnsTrue()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+                var keys = dictionary.Keys;
+
+                Assert.True(keys.Contains(5));
+            }
+
+            [Fact]
+            public void Contains_KeyNotInCollection_ReturnsFalse()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+                var keys = dictionary.Keys;
+
+                Assert.False(keys.Contains(11));
+            }
+
+            [Fact]
+            public void CopyTo_NullArray_ThrowsException()
+            {
+                var linkedDictionary = InitializeDictionarySequentialKeys(10);
+                var keys = linkedDictionary.Keys;
+                Assert.ThrowsAny<ArgumentNullException>(() => keys.CopyTo(null, 0));
+            }
+
+            [Fact]
+            public void CopyTo_OutOfRangeIndex_ThrowsException()
+            {
+                var linkedDictionary = InitializeDictionarySequentialKeys(10);
+                var keys = linkedDictionary.Keys;
+                int[] targetArray = new int[10];
+                Assert.ThrowsAny<ArgumentOutOfRangeException>(() => keys.CopyTo(targetArray, 11));
+            }
+
+            [Fact]
+            public void CopyTo_InvalidIndex_ThrowsException()
+            {
+                var linkedDictionary = InitializeDictionarySequentialKeys(10);
+                var keys = linkedDictionary.Keys;
+                int[] targetArray = new int[10];
+                Assert.ThrowsAny<ArgumentException>(() => keys.CopyTo(targetArray, 1));
+            }
+
+            [Fact]
+            public void CopyTo_ValidIndex_CopiesKeysInCorrectOrder()
+            {
+                var linkedDictionary = InitializeDictionarySequentialKeys(10);
+                var keys = linkedDictionary.Keys;
+                int[] targetArray = new int[11];
+                keys.CopyTo(targetArray, 1);
+
+                var expectedKeys = new List<int>() { 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+                Assert.Equal<int>(expectedKeys, targetArray);
+            }
+
+            [Fact]
+            public void GetEnumerator_ArbitarilyOrderedDictionary_KeysRetainOrder()
+            {
+                List<string> keys = new List<string>() { "a", "c", "q", "f", "t", "s", "v", "x", "z", "y" };
+                var linkedDictionary = new LinkedDictionary<string, int>();
+                foreach (string key in keys)
+                {
+                    linkedDictionary.Add(key, key.GetHashCode());
+                }
+
+                List<string> actual = linkedDictionary.Keys.ToList();
+                Assert.Equal<string>(keys, actual);
+            }
+
+            [Fact]
+            public void GetEnumerator_ArbitarilyOrderedDictionary_KeysRetainOrderAfterMutation()
+            {
+                List<string> keys = new List<string>() { "a", "c", "q", "f", "t", "s", "v", "x", "z", "y" };
+                var linkedDictionary = new LinkedDictionary<string, int>();
+                foreach (string key in keys)
+                {
+                    linkedDictionary.Add(key, key.GetHashCode());
+                }
+
+                keys.Remove("f");
+                linkedDictionary.Remove("f");
+                keys.Add("r");
+                linkedDictionary.Add("r", "r".GetHashCode());
+
+                List<string> actual = linkedDictionary.Keys.ToList();
+                Assert.Equal<string>(keys, actual);
+            }
+        }
+
+        public class ValueCollectionTests
+        {
+            [Fact]
+            public void Count_InitializedDictionary_ValueCountMatchesDictionaryCount()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+
+                Assert.Equal(dictionary.Count, dictionary.Values.Count);
+            }
+
+            [Fact]
+            public void Add_ArbitraryValueCollection_ThrowsException()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+                var values = dictionary.Values;
+
+                Action add = () => values.Add(1);
+                Assert.Throws<NotSupportedException>(add);
+            }
+
+            [Fact]
+            public void Clear_ArbitraryValueCollection_ThrowsException()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+                var values = dictionary.Values;
+
+                Action clear = () => values.Clear();
+                Assert.Throws<NotSupportedException>(clear);
+            }
+
+            [Fact]
+            public void Remove_ArbitraryValueCollection_ThrowsException()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+                var values = dictionary.Values;
+
+                Action remove = () => values.Remove(5);
+                Assert.Throws<NotSupportedException>(remove);
+            }
+
+            [Fact]
+            public void Contains_ValueInCollection_ReturnsTrue()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+                var values = dictionary.Values;
+
+                Assert.True(values.Contains(8));
+            }
+
+            [Fact]
+            public void Contains_ValueNotInCollection_ReturnsFalse()
+            {
+                var dictionary = InitializeDictionarySequentialKeys(10);
+                var values = dictionary.Values;
+
+                Assert.False(values.Contains(11));
+            }
+
+            [Fact]
+            public void CopyTo_NullArray_ThrowsException()
+            {
+                var linkedDictionary = InitializeDictionarySequentialKeys(10);
+                var values = linkedDictionary.Values;
+                Assert.ThrowsAny<ArgumentNullException>(() => values.CopyTo(null, 0));
+            }
+
+            [Fact]
+            public void CopyTo_OutOfRangeIndex_ThrowsException()
+            {
+                var linkedDictionary = InitializeDictionarySequentialKeys(10);
+                var values = linkedDictionary.Values;
+                int[] targetArray = new int[10];
+                Assert.ThrowsAny<ArgumentOutOfRangeException>(() => values.CopyTo(targetArray, 11));
+            }
+
+            [Fact]
+            public void CopyTo_InvalidIndex_ThrowsException()
+            {
+                var linkedDictionary = InitializeDictionarySequentialKeys(10);
+                var values = linkedDictionary.Values;
+                int[] targetArray = new int[10];
+                Assert.ThrowsAny<ArgumentException>(() => values.CopyTo(targetArray, 1));
+            }
+
+            [Fact]
+            public void CopyTo_ValidIndex_CopiesKeysInCorrectOrder()
+            {
+                var linkedDictionary = InitializeDictionarySequentialKeys(10);
+                var values = linkedDictionary.Values;
+                int[] targetArray = new int[12];
+                values.CopyTo(targetArray, 1);
+
+                var expectedvalues = new List<int>() { 0, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 0 };
+                Assert.Equal<int>(expectedvalues, targetArray);
+            }
+
+            [Fact]
+            public void GetEnumerator_ArbitarilyOrderedDictionary_KeysRetainOrder()
+            {
+                List<string> values = new List<string>() { "a", "c", "q", "f", "t", "s", "v", "x", "z", "y" };
+                var linkedDictionary = new LinkedDictionary<string, string>();
+                foreach (string value in values)
+                {
+                    linkedDictionary.Add(value, value);
+                }
+
+                List<string> actual = linkedDictionary.Values.ToList();
+                Assert.Equal<string>(values, actual);
+            }
+
+            [Fact]
+            public void GetEnumerator_ArbitarilyOrderedDictionary_KeysRetainOrderAfterMutation()
+            {
+                List<string> values = new List<string>() { "a", "c", "q", "f", "t", "s", "v", "x", "z", "y" };
+                var linkedDictionary = new LinkedDictionary<string, string>();
+                foreach (string value in values)
+                {
+                    linkedDictionary.Add(value, value);
+                }
+
+                values.Remove("f");
+                linkedDictionary.Remove("f");
+                values.Add("r");
+                linkedDictionary.Add("r", "r");
+
+                List<string> actual = linkedDictionary.Values.ToList();
+                Assert.Equal<string>(values, actual);
+            }
         }
     }
 }

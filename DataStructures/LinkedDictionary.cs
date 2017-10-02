@@ -8,7 +8,7 @@ using System.Collections;
 namespace DataStructures
 {
     [Serializable]
-    public class LinkedDictionary<TKey, TValue> : IDictionary<TKey, TValue> 
+    public class LinkedDictionary<TKey, TValue> : IDictionary<TKey, TValue>, IDeserializationCallback
     {
         private Entry header;
         private Dictionary<TKey, Entry> entryMap;
@@ -215,6 +215,12 @@ namespace DataStructures
             get { return false; }
         }
 
+
+        void IDeserializationCallback.OnDeserialization(object sender)
+        {
+            ((IDeserializationCallback)entryMap).OnDeserialization(sender);
+        }
+
         private void UpdateValueInLinkedList(Entry entry, TValue newValue)
         {
             version++;
@@ -231,12 +237,13 @@ namespace DataStructures
 
         private void InsertInLinkedList(Entry entry)
         {
-            entry.Before = header;
+            entry.Before = header.Before;
             entry.After = header;
             header.Before.After = entry;
             header.Before = entry;
         }
 
+        [Serializable]
         private class KeyCollection : ICollection<TKey>, IReadOnlyCollection<TKey>
         {
             private LinkedDictionary<TKey, TValue> dictionary;
@@ -314,7 +321,6 @@ namespace DataStructures
                 return new Enumerator(this.dictionary);
             }
 
-            [Serializable]
             public class Enumerator : IEnumerator<TKey>
             {
                 private LinkedDictionary<TKey, TValue> dictionary;
@@ -375,6 +381,7 @@ namespace DataStructures
             }
         }
 
+        [Serializable]
         public sealed class ValueCollection : ICollection<TValue>, IReadOnlyCollection<TValue>
         {
             private LinkedDictionary<TKey, TValue> dictionary;
@@ -472,7 +479,6 @@ namespace DataStructures
                 return new Enumerator(this.dictionary);
             }
 
-            [Serializable]
             public class Enumerator : IEnumerator<TValue>
             {
                 private LinkedDictionary<TKey, TValue> dictionary;
@@ -534,7 +540,6 @@ namespace DataStructures
             }
         }
 
-        [Serializable]
         public class Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>
         {
             private LinkedDictionary<TKey, TValue> dictionary;
